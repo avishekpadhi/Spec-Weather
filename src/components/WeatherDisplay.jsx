@@ -1,10 +1,26 @@
 import { useWeather } from '../context/WeatherContext';
 
+const errorIcons = {
+  notFound: '\u{1F50D}',
+  api: '\u2699\uFE0F',
+  network: '\u{1F310}',
+  validation: '\u{1F530}',
+};
+
 const WeatherDisplay = () => {
-  const { weather, error } = useWeather();
+  const { weather, error, retry } = useWeather();
 
   if (error) {
-    return <div className="error">{error}</div>;
+    const icon = errorIcons[error.type] || '\u26A0\uFE0F';
+    return (
+      <div className="error">
+        <span className="error-icon">{icon}</span>
+        <span className="error-message">{error.message}</span>
+        <button onClick={retry} className="retry-button">
+          Try Again
+        </button>
+      </div>
+    );
   }
 
   if (!weather) {

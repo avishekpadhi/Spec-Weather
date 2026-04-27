@@ -8,13 +8,15 @@ export const WeatherProvider = ({ children }) => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastCity, setLastCity] = useState(null);
 
   const fetchWeather = async (city) => {
     if (!city.trim()) {
-      setError('Please enter a city name');
+      setError({ type: 'validation', message: 'Please enter a city name', city: '' });
       return;
     }
 
+    setLastCity(city.trim());
     setLoading(true);
     setError(null);
 
@@ -25,17 +27,26 @@ export const WeatherProvider = ({ children }) => {
         `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
       );
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please set VITE_OPENWEATHER_API_KEY in .env');
-        }
-        if (response.status === 404) {
-          throw new Error('City not found');
-        }
-        throw new Error('Failed to fetch weather data');
+      const data = await response.json();
+
+      if (data.cod === '404') {
+        setError({ type: 'notFound', message: `We couldn't find '${city.trim()}'. Check spelling?`, city: city.trim() });
+        setWeather(null);
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
+      if (data.cod === '401' || data.cod === '429') {
+        setError({ type: 'api', message: 'Weather service issue. Try again shortly.', city: city.trim() });
+        setWeather(null);
+        setLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Something went wrong. Please try again.');
+      }
+
       setWeather({
         city: data.name,
         country: data.sys.country,
@@ -46,11 +57,17 @@ export const WeatherProvider = ({ children }) => {
         icon: data.weather[0].icon,
         windSpeed: data.wind.speed,
       });
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      setError({ type: 'network', message: 'No connection. Check your internet.', city: city.trim() });
       setWeather(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const retry = () => {
+    if (lastCity) {
+      fetchWeather(lastCity);
     }
   };
 
@@ -60,7 +77,7 @@ export const WeatherProvider = ({ children }) => {
   };
 
   return (
-    <WeatherContext.Provider value={{ weather, loading, error, fetchWeather, clearWeather }}>
+    <WeatherContext.Provider value={{ weather, loading, error, fetchWeather, clearWeather, retry }}>
       {children}
     </WeatherContext.Provider>
   );
